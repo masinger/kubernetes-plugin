@@ -9,6 +9,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.csanchez.jenkins.plugins.kubernetes.pipeline.execution.StrategicContainerExecutionDecorator;
 import org.jenkinsci.plugins.workflow.steps.BodyExecutionCallback;
 import org.jenkinsci.plugins.workflow.steps.BodyInvoker;
 import org.jenkinsci.plugins.workflow.steps.EnvironmentExpander;
@@ -35,7 +36,7 @@ public class ContainerStepExecution extends StepExecution {
     @SuppressFBWarnings(value = "SE_TRANSIENT_FIELD_NOT_RESTORED", justification = "not needed on deserialization")
     private final transient ContainerStep step;
 
-    private ContainerExecDecorator decorator;
+    private StrategicContainerExecutionDecorator decorator;
 
     ContainerStepExecution(ContainerStep step, StepContext context) {
         super(context);
@@ -72,7 +73,7 @@ public class ContainerStepExecution extends StepExecution {
             rcEnvVars = run.getEnvironment(taskListener);
         }
 
-        decorator = new ContainerExecDecorator();
+        decorator = new StrategicContainerExecutionDecorator();//new ContainerExecDecorator();
         decorator.setNodeContext(nodeContext);
         decorator.setContainerName(containerName);
         decorator.setEnvironmentExpander(env);

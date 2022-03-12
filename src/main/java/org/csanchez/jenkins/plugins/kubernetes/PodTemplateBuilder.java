@@ -29,13 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -46,7 +40,7 @@ import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.Util;
-import io.fabric8.kubernetes.api.model.PodSpecFluent;
+import io.fabric8.kubernetes.api.model.*;
 import org.apache.commons.lang.StringUtils;
 import org.csanchez.jenkins.plugins.kubernetes.model.TemplateEnvVar;
 import org.csanchez.jenkins.plugins.kubernetes.pipeline.PodTemplateStepExecution;
@@ -58,24 +52,8 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
 
 import hudson.TcpSlaveAgentListener;
 import hudson.slaves.SlaveComputer;
-import io.fabric8.kubernetes.api.model.Container;
-import io.fabric8.kubernetes.api.model.ContainerBuilder;
-import io.fabric8.kubernetes.api.model.ContainerPort;
-import io.fabric8.kubernetes.api.model.EnvVar;
-import io.fabric8.kubernetes.api.model.ExecAction;
-import io.fabric8.kubernetes.api.model.LocalObjectReference;
-import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.api.model.PodBuilder;
 import io.fabric8.kubernetes.api.model.PodFluent.MetadataNested;
 import io.fabric8.kubernetes.api.model.PodFluent.SpecNested;
-import io.fabric8.kubernetes.api.model.Probe;
-import io.fabric8.kubernetes.api.model.ProbeBuilder;
-import io.fabric8.kubernetes.api.model.Quantity;
-import io.fabric8.kubernetes.api.model.ResourceRequirements;
-import io.fabric8.kubernetes.api.model.ResourceRequirementsBuilder;
-import io.fabric8.kubernetes.api.model.Volume;
-import io.fabric8.kubernetes.api.model.VolumeMount;
-import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import io.jenkins.lib.versionnumber.JavaSpecificationVersion;
 import jenkins.model.Jenkins;
@@ -97,6 +75,8 @@ public class PodTemplateBuilder {
     private static final Logger LOGGER = Logger.getLogger(PodTemplateBuilder.class.getName());
 
     private static final Pattern SPLIT_IN_SPACES = Pattern.compile("([^\"]\\S*|\".+?\")\\s*");
+
+    private static final String INIT_AGENT_VOLUME_NAME = "init-volume";
 
     private static final String WORKSPACE_VOLUME_NAME = "workspace-volume";
     public static final Pattern FROM_DIRECTIVE = Pattern.compile("^FROM (.*)$");
@@ -209,6 +189,8 @@ public class PodTemplateBuilder {
         }
 
         volumes.put(WORKSPACE_VOLUME_NAME, template.getWorkspaceVolume().buildVolume(WORKSPACE_VOLUME_NAME, podName));
+        volumes.put(INIT_AGENT_VOLUME_NAME, new VolumeBuilder().withName(INIT_AGENT_VOLUME_NAME).withNewEmptyDir().endEmptyDir().build());
+
 
         Map<String, Container> containers = new HashMap<>();
         // containers from pod template
@@ -310,6 +292,44 @@ public class PodTemplateBuilder {
             }
             jnlp.setImage(jnlpImage);
         }
+
+        pod.getSpec().getInitContainers().add(new ContainerBuilder()
+                        .withName("copy-init-agent")
+                        .withImage(jnlp.getImage())
+                        .withCommand(
+                                "cp",
+                                "-r",
+                                "/opt/jenkins-agent/.", "/mnt/share/"
+                        )
+                        .addNewVolumeMount()
+                        .withName(INIT_AGENT_VOLUME_NAME)
+                        .withMountPath("/mnt/share")
+                        .endVolumeMount()
+                .build());
+
+        VolumeMount initAgentMount = new VolumeMountBuilder()
+                .withName(INIT_AGENT_VOLUME_NAME)
+                .withMountPath("/opt/jenkins-agent")
+                .build();
+        for (int containerIndex=0; containerIndex<pod.getSpec().getContainers().size(); containerIndex++) {
+            Container c = pod.getSpec().getContainers().get(containerIndex);
+            if(c.getName().trim().equalsIgnoreCase("jnlp")) {
+                continue;
+            }
+            c.getVolumeMounts().add(initAgentMount);
+            String agentPort = String.format("%d", 1200 + containerIndex);
+            c.setCommand(Arrays.asList(
+                    "/opt/jenkins-agent/bin/init-agent",
+                    "listen",
+                    agentPort
+            ));
+            c.setArgs(null);
+            jnlp.getEnv().add(new EnvVarBuilder()
+                            .withName(String.format("INIT_AGENT_%s", c.getName()))
+                            .withValue(agentPort)
+                    .build());
+        }
+
         Map<String, EnvVar> envVars = new HashMap<>();
         envVars.putAll(jnlpEnvVars(jnlp.getWorkingDir()));
         envVars.putAll(defaultEnvVars(template.getEnvVars()));

@@ -29,7 +29,7 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 /**
  * helper class for steps running in a kubernetes `node` context
  */
-class KubernetesNodeContext implements Serializable {
+public class KubernetesNodeContext implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -46,7 +46,7 @@ class KubernetesNodeContext implements Serializable {
     }
 
     // TODO remove the Exception thrown
-    String getPodName() throws Exception {
+    public String getPodName() throws Exception {
         return podName;
     }
 
@@ -55,7 +55,7 @@ class KubernetesNodeContext implements Serializable {
         return namespace;
     }
 
-    KubernetesClient connectToCloud() throws Exception {
+    public KubernetesClient connectToCloud() throws Exception {
         return getKubernetesSlave().getKubernetesCloud().connect();
     }
 
