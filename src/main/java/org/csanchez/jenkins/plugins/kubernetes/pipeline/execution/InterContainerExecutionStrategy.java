@@ -13,10 +13,21 @@ import java.io.PipedOutputStream;
 
 public class InterContainerExecutionStrategy implements ContainerExecutionStrategy {
 
+    public static final String NON_ALPHANUMERIC_CHARS = "[^A-z0-9]";
     private final String container;
 
     public InterContainerExecutionStrategy(String container) {
         this.container = container;
+    }
+
+
+    private static String getCanonicalContainerName(String container) {
+        return container.toUpperCase()
+                .replaceAll(NON_ALPHANUMERIC_CHARS, "_");
+    }
+
+    public static String getInitAgentPortEnvVariableName(String container) {
+        return String.format("INIT_AGENT_%s", getCanonicalContainerName(container));
     }
 
     @Override

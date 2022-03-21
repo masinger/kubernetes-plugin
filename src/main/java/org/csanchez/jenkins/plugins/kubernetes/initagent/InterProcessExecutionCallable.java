@@ -4,6 +4,7 @@ import jenkins.security.MasterToSlaveCallable;
 import org.apache.commons.compress.utils.IOUtils;
 import org.csanchez.jenkins.plugins.kubernetes.initagent.model.ProcessTerminatedResponse;
 import org.csanchez.jenkins.plugins.kubernetes.initagent.model.StartProcessMessage;
+import org.csanchez.jenkins.plugins.kubernetes.pipeline.execution.InterContainerExecutionStrategy;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,7 +37,7 @@ public class InterProcessExecutionCallable extends MasterToSlaveCallable<Process
 
     @Override
     public ProcessTerminatedResponse call() throws IOException {
-        Integer port = Integer.valueOf(System.getenv("INIT_AGENT_" + container));
+        Integer port = Integer.valueOf(System.getenv(InterContainerExecutionStrategy.getInitAgentPortEnvVariableName(container)));
         InterContainerClient interContainerClient = new InterContainerClient();
         InterContainerChannel containerChannel = interContainerClient.connect("localhost", port);
 

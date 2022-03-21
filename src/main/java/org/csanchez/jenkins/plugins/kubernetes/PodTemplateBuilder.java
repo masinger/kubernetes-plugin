@@ -44,6 +44,7 @@ import io.fabric8.kubernetes.api.model.*;
 import org.apache.commons.lang.StringUtils;
 import org.csanchez.jenkins.plugins.kubernetes.model.TemplateEnvVar;
 import org.csanchez.jenkins.plugins.kubernetes.pipeline.PodTemplateStepExecution;
+import org.csanchez.jenkins.plugins.kubernetes.pipeline.execution.InterContainerExecutionStrategy;
 import org.csanchez.jenkins.plugins.kubernetes.pod.decorator.PodDecorator;
 import org.csanchez.jenkins.plugins.kubernetes.volumes.PodVolume;
 import org.csanchez.jenkins.plugins.kubernetes.volumes.ConfigMapVolume;
@@ -325,7 +326,7 @@ public class PodTemplateBuilder {
             ));
             c.setArgs(null);
             jnlp.getEnv().add(new EnvVarBuilder()
-                            .withName(String.format("INIT_AGENT_%s", c.getName()))
+                            .withName(InterContainerExecutionStrategy.getInitAgentPortEnvVariableName(c.getName()))
                             .withValue(agentPort)
                     .build());
         }
